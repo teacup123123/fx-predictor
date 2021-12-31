@@ -3,32 +3,35 @@ from dataclasses import dataclass
 import datasets.yahoo as yh
 
 # jpy = yh.load('JPY=X')
-from basket import PositionAssets, Position, Currency, Rates, CurrencyBasket
+from fx_library import DeadlockAssets, Direction, Currency, Rates, CurrencyBasket
 
 
 @dataclass
-class PA_eur_cad_jpy(PositionAssets):
-    @PositionAssets.decorator_position
-    def cad_jpy_b(self):
-        return Position(Currency.cad, Currency.jpy, Currency.jpy, isBuy=True)
+class DL_eur_cad_jpy(DeadlockAssets):
+    @property
+    @DeadlockAssets.auto_add_into_basket
+    def cad_jpy_b(self) -> Direction:
+        return Direction(Currency.cad, Currency.jpy, Currency.jpy, isBuy=True)
 
-    @PositionAssets.decorator_position
-    def eur_jpy_s(self):
-        return Position(Currency.eur, Currency.jpy, Currency.jpy, isBuy=False)
+    @property
+    @DeadlockAssets.auto_add_into_basket
+    def eur_jpy_s(self) -> Direction:
+        return Direction(Currency.eur, Currency.jpy, Currency.jpy, isBuy=False)
 
-    @PositionAssets.decorator_position
-    def eur_cad_b(self):
-        return Position(Currency.eur, Currency.cad, Currency.jpy, isBuy=True)
+    @property
+    @DeadlockAssets.auto_add_into_basket
+    def eur_cad_b(self) -> Direction:
+        return Direction(Currency.eur, Currency.cad, Currency.jpy, isBuy=True)
 
 
 if __name__ == '__main__':
     rates = Rates()
 
-    paloop = PA_eur_cad_jpy()
-    ls = rates[Currency.eur] / rates[Currency.cad]
-    paloop.cad_jpy_b.enter(ls, rates)
-    paloop.eur_cad_b.enter(1, rates)
-    paloop.eur_jpy_s.enter(1, rates)
+    paloop = DL_eur_cad_jpy()
+    value_jpy = rates[Currency.eur] * 123456.546
+    paloop.cad_jpy_b.open(value_jpy / rates[Currency.cad], rates)
+    paloop.eur_cad_b.open(value_jpy / rates[Currency.eur], rates)
+    paloop.eur_jpy_s.open(value_jpy / rates[Currency.eur], rates)
     print(paloop)
 
     val = paloop.unrealized(rates)
@@ -36,9 +39,9 @@ if __name__ == '__main__':
     rates[Currency.cad] *= 1.1
 
     val = paloop.unrealized(rates)
-    paloop.cad_jpy_b.exit(ls, rates)
-    # paloop.eur_cad_b.exit(1, rates)
-    # paloop.eur_jpy_s.exit(1, rates)
+    paloop.cad_jpy_b.close(paloop.cad_jpy_b.base_quantity, rates)
+    # paloop.eur_cad_b.close(1, rates)
+    # paloop.eur_jpy_s.close(1, rates)
     cb = paloop.currency_basket()
 
     print()
@@ -52,3 +55,6 @@ if __name__ == '__main__':
     #
     # positionAssets = PositionAssets()
     # print(positionAssets)
+
+    # for time in times:
+    #     pass
