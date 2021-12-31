@@ -1,11 +1,11 @@
 import math
-from collections import defaultdict
-from enum import Enum, auto
-from dataclasses import dataclass, fields, field
-from typing import List, Callable, Any
+from enum import Enum
+from dataclasses import dataclass, field
+from collections import Sized
+from typing import List, Callable, Any, NewType, Union, Iterable, Type
 
 
-class EnumIdx0(Enum):
+class CurrencyEnumIdx0(Enum):
     """automatic enum structure that starts with index = 0 """
 
     def __new__(cls):
@@ -15,64 +15,61 @@ class EnumIdx0(Enum):
         return obj
 
 
-class Currency(EnumIdx0):
-    """available currencies"""
-    jpy = ()
-    cad = ()
-    eur = ()
-    usd = ()
+Derived_CurrencyEnumIdx0 = NewType('derived_CurrencyEnumIdx0', CurrencyEnumIdx0)
 
 
 @dataclass
 class Rates:
     """The rates at a specific time, thin wrapper of a list object"""
+    home_currency: Derived_CurrencyEnumIdx0
     as_list: List[float] = field(default_factory=list)
-    home_currency: Currency = Currency.jpy
 
-    def __init__(self):
-        self.as_list = [math.nan] * (len(Currency))
-        self.home_currency = Currency.jpy
-        self[Currency.jpy] = 1.
-        self[Currency.eur] = 130.
-        self[Currency.cad] = 90.
-        self[Currency.usd] = 115.16
+    def __init__(self, currency_enum, home_currency: Derived_CurrencyEnumIdx0):
+        self.as_list = [math.nan] * (len(currency_enum))
+        self.home_currency = home_currency
 
-    def of_currency(self, c: Currency):
+    def of_currency(self, c: Derived_CurrencyEnumIdx0):
         return self.as_list[c.value]
 
-    def __getitem__(self, currency: Currency):
-        return self.as_list[currency.value]
+    def __getitem__(self, Derived_CurrencyEnumIdx0: Derived_CurrencyEnumIdx0):
+        return self.as_list[Derived_CurrencyEnumIdx0.value]
 
-    def __setitem__(self, currency: Currency, value):
-        self.as_list[currency.value] = value
+    def __setitem__(self, Derived_CurrencyEnumIdx0: Derived_CurrencyEnumIdx0, value):
+        self.as_list[Derived_CurrencyEnumIdx0.value] = value
 
 
 @dataclass
 class CurrencyBasket:
     """A basket with different currencies of different interest rates"""
-    as_list = [0.] * (len(Currency))
+    _CurrencyEnumIdx0: Union[Sized, Iterable, Type]
+    as_list: list
+
+    @property
+    def CurrencySet(self):
+        return [c.name for c in self._CurrencyEnumIdx0]
+
+    def __init__(self, _CurrencyEnumIdx0: Union[Sized, Iterable, Type]):
+        self._CurrencyEnumIdx0 = _CurrencyEnumIdx0
+        self.as_list = [0.] * (len(_CurrencyEnumIdx0))
 
     def unrealized(self, rates: Rates):
         result_home = 0.
-        for currency, quantity in zip(Currency, self.as_list):
-            result_home += quantity * rates.of_currency(currency)
+        for Derived_CurrencyEnumIdx0, quantity in zip(self._CurrencyEnumIdx0, self.as_list):
+            result_home += quantity * rates.of_currency(Derived_CurrencyEnumIdx0)
         return result_home
 
-    def __getitem__(self, currency: Currency):
-        return self.as_list[currency.value]
+    def __getitem__(self, Derived_CurrencyEnumIdx0: Derived_CurrencyEnumIdx0):
+        return self.as_list[Derived_CurrencyEnumIdx0.value]
 
-    def __setitem__(self, currency: Currency, value):
-        self.as_list[currency.value] = value
-
-    def __repr__(self):
-        return f'CurrencyBasket{repr({k: v for k, v in zip(Currency, self.as_list)})}'
+    def __setitem__(self, Derived_CurrencyEnumIdx0: Derived_CurrencyEnumIdx0, value):
+        self.as_list[Derived_CurrencyEnumIdx0.value] = value
 
 
 @dataclass
 class Direction:
-    base_currency: Currency
-    quote_currency: Currency
-    home_currency: Currency
+    base_currency: Derived_CurrencyEnumIdx0
+    quote_currency: Derived_CurrencyEnumIdx0
+    home_currency: Derived_CurrencyEnumIdx0
 
     # this section for calculating swap
     swap_rate: float = 0.
@@ -81,7 +78,7 @@ class Direction:
     Let:
         * I_XB = daily interest rate to borrow X from MM
         * I_XL = daily interest rate to lend X to MM
-        * r_X = conversion rate with respect to the home currency 
+        * r_X = conversion rate with respect to the home Derived_CurrencyEnumIdx0 
     
     per day: SWAP = (I_t?*q_t*r_t/r_b + I_b?*q_b) amount of quote is gained:
     ? = B or L depending on the lending nature borrowing nature of the client toward MM.
@@ -138,11 +135,16 @@ class Direction:
 
 @dataclass
 class DeadlockAssets:
-    positions: List[Direction] = field(default_factory=list)
+    Currency_type: Union[Sized, Iterable, Type]
+    directions: List[Direction]
+
+    def __init__(self, Currency_type: Union[Sized, Iterable, Type]):
+        self.Currency_type = Currency_type
+        self.directions = []
 
     def currency_basket(self):
-        cb = CurrencyBasket()
-        for position in self.positions:
+        cb = CurrencyBasket(self.Currency_type)
+        for position in self.directions:
             cb[position.base_currency] += position.base_quantity
             cb[position.quote_currency] += position.quote_quantity
         return cb
@@ -152,7 +154,7 @@ class DeadlockAssets:
 
     @property
     def realized(self):
-        return sum(position.realized_home for position in self.positions)
+        return sum(position.realized_home for position in self.directions)
 
     @staticmethod
     def auto_add_into_basket(position_factory: Callable[[Any], Direction]):
@@ -163,9 +165,9 @@ class DeadlockAssets:
             self: DeadlockAssets
             if added_idx == -1:
                 position = position_factory(self)
-                added_idx = len(self.positions)
-                self.positions.append(position)
-            return self.positions[added_idx]
+                added_idx = len(self.directions)
+                self.directions.append(position)
+            return self.directions[added_idx]
 
         return decorated
 
@@ -175,19 +177,7 @@ class DeadlockAssets:
         #     self: PositionAssets
         #     if added_at == -1:
         #         position = position_Creator(self)
-        #         added_at = len(self.positions)
-        #         self.positions.append(position)
-        #     self.positions[added_at] = value
+        #         added_at = len(self.directions)
+        #         self.directions.append(position)
+        #     self.directions[added_at] = value
         # return property(decorated, fset=decorated_setter)
-
-
-if __name__ == '__main__':
-    # Here is a small example of usage
-    rates = Rates()
-    print(rates.of_currency(Currency.usd))
-    print(rates)
-    print(rates[Currency.usd])
-    rates[Currency.usd] = 123.1453  # updates
-    basket = CurrencyBasket()
-    basket[Currency.usd] += 1.
-    print(basket)
