@@ -128,6 +128,5 @@ dmypy.json
 # Pyre type checker
 .pyre/
 .idea/
-datasets/csv/
-datasets/pickle/
 *.pickle
+*.csv
