@@ -69,8 +69,8 @@ def no_positive_loops():
 
     nodes: List
     links: Dict[str, Dict]
-    interdiction = ['TRY', 'ZAR', 'CHF']
-    # interdiction = ['TRY','ZAR']
+    # interdiction = ['TRY', 'ZAR', 'CHF']
+    interdiction = ['TRY','ZAR']
     # interdiction = ['TRY']
     # interdiction = ['ZAR']
     for _ in interdiction:

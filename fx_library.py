@@ -1,8 +1,13 @@
 import math
-from enum import Enum
+from enum import Enum, auto
 from dataclasses import dataclass, field
 from collections import Sized
 from typing import List, Callable, Any, NewType, Union, Iterable, Type
+
+
+class Nature(Enum):
+    buy = auto()
+    sell = auto()
 
 
 class CurrencyEnumIdx0(Enum):
@@ -129,8 +134,10 @@ class Direction:
         quote_retained = -rates.of_currency(self.base_currency) / rates.of_currency(
             self.quote_currency) * self.base_quantity
         redeemed_quote = self.quote_quantity - quote_retained
-        self.realized_home += redeemed_quote * rates.of_currency(self.quote_currency)
+        realized = redeemed_quote * rates.of_currency(self.quote_currency)
+        self.realized_home += realized
         self.quote_quantity -= redeemed_quote
+        return realized
 
 
 @dataclass
