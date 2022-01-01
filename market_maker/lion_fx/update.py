@@ -1,3 +1,4 @@
+import requests
 from quick_query.xe_com import grab
 
 import os
@@ -5,6 +6,29 @@ import os
 _dir, _ = os.path.split(__file__)
 
 file = r'data_lionfx_swap.csv'  # manually downloaded from https://hirose-fx.co.jp/swap/lionfx_swap.csv
+
+
+def update_swap_data():
+    got = requests.get(r'https://hirose-fx.co.jp/swap/lionfx_swap.csv')
+    string = got.content.decode('shift-jis')
+    lines = string.splitlines()
+    lines = [line.strip() for line in lines]
+    header = lines[0]
+    header = header.split(',')
+    header[0] = 'date'
+    for i in range(len(header) - 1, 0, -1):
+        if i % 2 == 0:
+            header[i] = header[i - 1]
+    for i, (word, type) in enumerate(zip(header, lines[2].split(','))):
+        if type.endswith('売り'):
+            header[i] += '_sell'
+        elif type.endswith('買い'):
+            header[i] += '_buy'
+    del lines[1:3]
+    lines[0] = ','.join(header)
+    with open('data_lionfx_swap.csv', 'w') as f:
+        f.write('\n'.join(lines))
+
 
 def update():
     rates = {}
@@ -18,24 +42,6 @@ def update():
     with open(rf'{_dir}/data_currency_now.txt', 'w') as f:
         f.write('\n'.join(f'{k} {v}' for k, v in rates.items()))
 
-def sanitize_csv():
-    with open(file, 'r') as f:
-        lines = f.readlines()
 
-    _cache = '?'
-
-    # def format(i, token: str):
-    #     global _cache
-    #     if i == 0:
-    #         return token
-    #     else:
-    #         if i % 2 == 1:
-    #             _cache = token
-    #             return _cache + '_sell' if not _cache.endswith('_sell') else _cache
-    #         else:
-    #             return _cache + '_buy' if not _cache.endswith('_buy') else _cache
-
-    # lines[0] = ','.join([format(i, nature) for i, nature in enumerate(lines[0].split(','))]) + '\n'
-    #
-    # with open(file, 'w') as f:
-    #     f.writelines(lines)
+if __name__ == '__main__':
+    update_swap_data()
