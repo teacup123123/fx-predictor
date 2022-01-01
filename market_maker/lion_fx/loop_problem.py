@@ -30,14 +30,18 @@ def build_problem(topickle=True):
         nodes = list(currency_to_jpy.keys())
 
     df = pd.read_csv(data_lionfx_swap)
-    # units in pips per 3 days
 
+    # units in pips (0.001 movement in the pair)
     for column in df.columns:
         if column != 'date':
             base, quote, nature = re.match('(...)/(...)_(\w+)', column).groups()
-            df[column] *= 1 / (lotsize[f'{base}/{quote}'] * currency_to_jpy[base]) * currency_to_jpy[quote]
+            # lot_volume_jpy = lotsize[f'{base}/{quote}'] * currency_to_jpy[base]
+            base_quote_rate = (currency_to_jpy[base] / currency_to_jpy[quote])
 
-    # one week average:
+            pip_unitary = 1 / lotsize[f'{base}/JPY']
+            df[column] *= pip_unitary / (currency_to_jpy[base] / currency_to_jpy[quote])
+
+            # one week average:
     last = df.iloc[-5:]
     weekly = last.sum()
     # print(weekly)
@@ -47,11 +51,12 @@ def build_problem(topickle=True):
             base, quote, nature = re.match('(...)/(...)_(\w+)', column).groups()
             if nature == 'buy':
                 links[quote][base] = value * 365 / 7  # annual
-                print((base, quote, nature), quote, base, value * 365 / 7)
+                print((base, quote, nature), value * 365 / 7)
             else:
                 links[base][quote] = value * 365 / 7  # annual
-                print((base, quote, nature), base, quote, value * 365 / 7)
+                print((base, quote, nature), value * 365 / 7)
 
+    # raise Exception
     if topickle:
         with open('graph.pickle', 'wb') as f:
             pickle.dump((nodes, links), f)
@@ -64,7 +69,9 @@ def no_positive_loops():
 
     nodes: List
     links: Dict[str, Dict]
-    interdiction = ['TRY', 'ZAR']
+    interdiction = ['TRY','ZAR']
+    # interdiction = ['TRY']
+    interdiction = ['ZAR']
     for _ in interdiction:
         nodes.remove(_)
         del links[_]
@@ -118,5 +125,5 @@ def no_positive_loops():
 
 
 if __name__ == '__main__':
-    # build_problem()
+    build_problem()
     no_positive_loops()
