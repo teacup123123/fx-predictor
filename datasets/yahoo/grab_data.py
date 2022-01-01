@@ -13,9 +13,9 @@ def grab(symbol, range='2y', interval='60m'):
 
 
 if __name__ == '__main__':
-    # range, interval = '2y', '60m'
+    range, interval = '2y', '60m'
     # range, interval = '10y', '1d'
-    range, interval = '1mo', '5m'
+    # range, interval = '1mo', '5m'
     with open(r'./symbols.txt', 'r') as f:
         lines = f.readlines()
     for symbol in lines:

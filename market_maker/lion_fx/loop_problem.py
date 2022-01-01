@@ -38,8 +38,8 @@ def build_problem(topickle=True):
             # lot_volume_jpy = lotsize[f'{base}/{quote}'] * currency_to_jpy[base]
             base_quote_rate = (currency_to_jpy[base] / currency_to_jpy[quote])
 
-            pip_unitary = 1 / lotsize[f'{base}/JPY']
-            df[column] *= pip_unitary / (currency_to_jpy[base] / currency_to_jpy[quote])
+            pip_rate = 1 / lotsize[f'{base}/JPY']
+            df[column] *= pip_rate / (currency_to_jpy[base] / currency_to_jpy[quote])
 
             # one week average:
     last = df.iloc[-5:]
@@ -69,9 +69,10 @@ def no_positive_loops():
 
     nodes: List
     links: Dict[str, Dict]
-    interdiction = ['TRY','ZAR']
+    interdiction = ['TRY', 'ZAR', 'CHF']
+    # interdiction = ['TRY','ZAR']
     # interdiction = ['TRY']
-    interdiction = ['ZAR']
+    # interdiction = ['ZAR']
     for _ in interdiction:
         nodes.remove(_)
         del links[_]
