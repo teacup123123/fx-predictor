@@ -86,6 +86,9 @@ class TimeSeriesMerged:
                     i += 1
                 self[currencyname][i] = value
                 lastval = value
+            while i < len(good):
+                self[currencyname][i] = lastval
+                i += 1
         self.merged_times = [t for t, ok in zip(pruned, good) if ok]
         self.as_np = self.as_np[:, good]
 
