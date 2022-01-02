@@ -35,21 +35,21 @@ import pylab as pl
 import datasets.fred.unified_format as fred
 from datasets.t_rate_list_format import TimeSeriesMerged
 
-core = 'CHF JPY NZD gbp usd CAD'
+core = 'EUR CHF JPY NZD gbp usd CAD'
 rim = 'sek mxn aud'
 correlation = f'{core} {rim}'.upper().split()
 
 if __name__ == '__main__':
-    DAYS = 365 * 15
 
     # load fred
-    if False:
+    if True:
         fred.initialize(correlation)
         with open('initialized.pickle', 'wb') as f:
             pk.dump(fred.as_TSS.as_dict(), f)
 
     # fred -> merged logged
-    if False:
+    DAYS = 365 * 20
+    if True:
         period = (pd.Timestamp.now(tz='UTC') - pd.Timedelta(days=DAYS), pd.Timestamp.now(tz='UTC'))
         with open('initialized.pickle', 'rb') as f:
             fred.as_TSS.load_dict(pk.load(f))
@@ -78,21 +78,24 @@ if __name__ == '__main__':
 
     pl.figure()
     pl.title('mergedlogged')
-    for c in P.T @ mergedlogged.as_np:
-        pl.plot(c)
-    pl.legend([f'E{x:.2e}' for x in ev])
+    for i, c in enumerate(P.T @ mergedlogged.as_np):
+        if i == 4: break
+        pl.plot(mergedlogged.merged_times, c)
+    pl.legend([f'E{x:.2e}' for x in ev][:4])
 
     pl.figure()
     pl.title('lowcut')
-    for c in P.T @ (mergedlogged.as_np - high_passed.as_np):
-        pl.plot(c)
-    pl.legend([f'E{x:.2e}' for x in ev])
+    for i, c in enumerate(P.T @ (mergedlogged.as_np - high_passed.as_np)):
+        if i == 4: break
+        pl.plot(mergedlogged.merged_times, c)
+    pl.legend([f'E{x:.2e}' for x in ev][:4])
 
     pl.figure()
     pl.title('high_passed')
-    for c in P.T @ high_passed.as_np:
-        pl.plot(c)
-    pl.legend([f'E{x:.2e}' for x in ev])
+    for i, c in enumerate(P.T @ high_passed.as_np):
+        if i == 4: break
+        pl.plot(high_passed.merged_times, c)
+    pl.legend([f'E{x:.2e}' for x in ev][:4])
     pl.show()
     # fred.as_TSS.JPY.plot()
     # pl.show()
