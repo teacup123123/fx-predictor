@@ -1,8 +1,10 @@
 import itertools
+import math
 import pickle as pk
 import os
 import re
 import time
+from collections import defaultdict
 
 import numpy as np
 import pylab as pl
@@ -133,6 +135,26 @@ def weave(start, end, duration_str: str = '2y', resolution_str: str = '60m', inc
         if k != 'USD':
             full_data[k] = full_data[k] / full_data['USD']
     full_data['USD'] = full_data['USD'] * 0 + 1.
+
+    lastTime = defaultdict(float)
+    for i in range(len(full_data) // 4):
+        best = (math.inf, -1)
+        for permutation in perms:
+            score = 0.
+            for k in full_data:
+                last = lastTime[k]
+                for pi in permutation:
+                    score += np.abs(last - np.log(full_data[k][i * 4 + pi]))
+                    last = np.log(full_data[k][i * 4 + pi])
+            best = min(best, (score, permutation))
+
+        for k in full_data:
+            _, permutation = best
+            times = ts[i * 4:i * 4 + 4]
+            vals = full_data[k][i * 4:i * 4 + 4]
+            vals = [vals[i] for i in permutation]
+            for j, t, v in zip(range(i * 4, i * 4 + 4), times, vals):
+                full_data[k][j] = v
     return ts, full_data
 
 
@@ -159,12 +181,13 @@ if __name__ == '__main__':
     include_only = '''NZD JPY CAD GBP MXN EUR CHF USD AUD ZAR'''.split()
     for duration_str, resolution_str in [('1mo', '5m'), ('2y', '60m'), ('10y', '1d')]:
         # initially
-        # start, end = 0, 1640384100
-        # times, full_data = weave(resolution_str=resolution_str, duration_str=duration_str,
-        #                          start=start * 0, end=end, include_only=include_only)
-        # with open(os.path.join(_dir, f'accu_{duration_str}_{resolution_str}_{start}_{end}.pickle'), 'wb') as f:
-        #     pk.dump((times, full_data), f)
+        start, end = 0, 1640000000
+        times, full_data = weave(resolution_str=resolution_str, duration_str=duration_str,
+                                 start=start * 0, end=end, include_only=include_only)
+        with open(os.path.join(_dir, f'accu_{duration_str}_{resolution_str}_{start}_{end}.pickle'), 'wb') as f:
+            pk.dump((times, full_data), f)
 
+        # append
         append(duration_str, resolution_str, include_only)
 
     # base, quote = 'AUD USD'.split()
