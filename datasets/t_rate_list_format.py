@@ -101,7 +101,6 @@ class TimeSeriesMerged:
     def copy(self):
         return copy.deepcopy(self)
 
-    @property
     def remove_trend(self, deg=1):
         result = self.copy()
         ts = [t - result.merged_times[0] for t in result.merged_times]

@@ -13,15 +13,13 @@ def grab(symbol, range='2y', interval='60m'):
 
 
 if __name__ == '__main__':
-    range, interval = '2y', '60m'
-    # range, interval = '10y', '1d'
-    # range, interval = '1mo', '5m'
-    with open(r'./symbols.txt', 'r') as f:
-        lines = f.readlines()
-    for symbol in lines:
-        symbol = symbol.strip()
-        with open(f'pickles/{symbol}_{range}_{interval}.pickle', 'wb') as f:
-            jobj = json.loads(grab(symbol, range, interval))
-            pickle.dump(jobj, f)
+    for range, interval in [('1mo', '5m'), ('2y', '60m'), ('10y', '1d')]:
+        with open(r'./symbols.txt', 'r') as f:
+            lines = f.readlines()
+        for symbol in lines:
+            symbol = symbol.strip()
+            with open(f'pickles/{symbol}_{range}_{interval}.pickle', 'wb') as f:
+                jobj = json.loads(grab(symbol, range, interval))
+                pickle.dump(jobj, f)
 
-        print(f'{symbol} pickled!')
+            print(f'{symbol} pickled!')
