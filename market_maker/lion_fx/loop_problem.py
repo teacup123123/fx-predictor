@@ -3,10 +3,12 @@ import math
 import os.path
 import pickle
 import re
-from collections import defaultdict
+from collections import defaultdict, deque
 from typing import List, Dict
 
+import numpy as np
 import pandas as pd
+import scipy.optimize
 
 _dir, _ = os.path.split(__file__)
 
@@ -70,7 +72,7 @@ def no_positive_loops():
     nodes: List
     links: Dict[str, Dict]
     # interdiction = ['TRY', 'ZAR', 'CHF']
-    interdiction = ['TRY','ZAR']
+    interdiction = ['TRY', 'ZAR']
     # interdiction = ['TRY']
     # interdiction = ['ZAR']
     for _ in interdiction:
@@ -110,21 +112,81 @@ def no_positive_loops():
     goods = {int(v * 1_000_000): rest for v, *rest in goods}
     goods = [(v / 1_000_000,) + tuple(rest) for v, rest in goods.items()]
     goods.sort()
+
     for g in goods:
         print(g)
 
-    profitable = (-math.inf, -1, -1)
-    for a in nodes:
-        for b in nodes:
-            if b != a:
-                forward = final_graph[a][b]
-                back = links[b][a]
-                loop_distance = 1
-                if (loop_distance, a, b) < profitable:
-                    profitable = (loop_distance, a, b)
-    print(profitable)
+    # goods = list(filter(lambda x: x[0] > -0.0015, goods))
+    with open('cycles.pickle', 'wb') as f:
+        pickle.dump(goods, f)
+
+
+def guess_internal():
+    with open('cycles.pickle', 'rb') as f:
+        frees = pickle.load(f)
+    with open('graph.pickle', 'rb') as f:
+        nodes, links = pickle.load(f)
+
+    simple_graph_links = set()
+    good_cycles, totinterests = [], []
+    for interest, totinterest, ll in frees:
+        # if interest < 0.01:
+        if True:
+            good_cycles.append((totinterest, ll))
+            totinterests.append(totinterest)
+            for l in zip(ll[:-1] + [ll[-1]], ll[1:] + [ll[0]]):
+                simple_graph_links.add(l)
+    simple_graph_links_idx = {l: i for i, l in enumerate(simple_graph_links)}
+    simple_graph_links = list(simple_graph_links)
+    mat = np.zeros((len(good_cycles), len(simple_graph_links)))
+    for i, (totinterest, ll) in enumerate(good_cycles):
+        for l in zip(ll[:-1] + [ll[-1]], ll[1:] + [ll[0]]):
+            mat[i, simple_graph_links_idx[l]] += 1
+
+    (commission, *_) = np.linalg.lstsq(mat, totinterests)
+    voltage = defaultdict(float)
+    root = 'JPY'
+    voltage[root] = 0.
+    bfs = deque([root])
+    while len(bfs):
+        root = bfs.popleft()
+        for dst in links[root]:
+            if (root, dst) in simple_graph_links_idx and dst not in voltage:
+                voltage[dst] = links[root][dst] - commission[simple_graph_links_idx[(root, dst)]]
+                bfs.append(dst)
+    for (root, dst) in simple_graph_links_idx:
+        commission[simple_graph_links_idx[(root, dst)]] += voltage[dst] - voltage[root]
+
+    for c, _ in [
+        ('USD', -0.004 - 0.004 - 0.0006 - 0.0001 + 0.0002 + 0.0005 - 0.0007),
+        ('MXN', 0.05 - 0.009 - 0.1 + 0.0001 + 0.0023 + 0.0006),
+        ('NZD', -0.0022 - 0.0044 - 0.005 + 0.0030 + 0.0016 - 0.0031 + 0.0005 - 0.00045 + 0.0003),
+        ('JPY', -0.005 + 0.0016 + 0.0005),
+        ('GBP', -0.0034 - 0.0005 - 0.005 + 0.0007),
+        ('AUD', -0.0032 - 0.003),
+        ('SGD', -0.0013 - 0.004 - 0.001),
+        ('NOK', -0.0018 - 0.005),
+        ('SEK', -0.004),
+        ('CAD', -0.006 + 0.0005),
+        ('PLN', -0.0008 - 0.0002 - 0.001),
+        ('EUR', -0.0009 - 0.0002),
+        ('CHF', +0.0014 + 0.0001),
+    ]:
+        for (src, dst) in simple_graph_links_idx:
+            commission[simple_graph_links_idx[(src, dst)]] += _ * (dst == c) - _ * (src == c)
+
+    for (root, dst) in simple_graph_links_idx:
+        print(f'{root}->{dst} = {commission[simple_graph_links_idx[(root, dst)]]:+.4f}')
+
+    linksTrue = copy.deepcopy(links)
+
+    for l in links:
+        pass
+
+    print()
 
 
 if __name__ == '__main__':
-    build_problem()
+    # build_problem()
     no_positive_loops()
+    guess_internal()

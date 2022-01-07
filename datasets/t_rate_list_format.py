@@ -32,7 +32,6 @@ class TimeSeriesSingle(List[Tuple[pd.Timestamp, float]]):
 
     def plot(self):
         ts, rates = zip(*self.np)
-        pl.figure()
         pl.plot(ts, rates)
 
 
