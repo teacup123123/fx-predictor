@@ -228,6 +228,7 @@ def main():
 
     MAX_EV = len(mergedlogged.currencies) - 1
     ev, P, Pinv, covar = svd(high_passed)
+    ev = np.abs(ev)
     sev = np.sqrt(ev)
 
     volitility = pd.DataFrame(P[:, :MAX_EV], index=mergedlogged.currencies,
@@ -269,18 +270,37 @@ def main():
         for _ in playables:
             quote, base, profit_range, profit, *_ = re.match(
                 '(\w+)->(\w+):([0-9\.]+),-([0-9\.]+),-([0-9\.]+)', _).groups()
-            playables_sorted.append((quote, base, float(profit)))
+            playables_sorted.append((float(profit), quote, base))
         playables_sorted.sort(reverse=True)
-        for quote, base, profit in playables_sorted:
+        for profit, quote, base in playables_sorted:
             quote_idx, base_idx = map(mergedlogged.currencies.index, (quote, base))
-            _ = np.zeros(len(mergedlogged.currencies))
+            _ = np.zeros((len(mergedlogged.currencies), 1))
             _[quote_idx] = -1
             _[base_idx] = 1
+            _ = np.diag(sev) @ P.T @ _ @ _.T @ P @ np.diag(sev) * 1e3
             bases.append(_)
             profits.append(profit)
-        bases = np.array(bases).T
+        profits = np.array(profits)
+        bases = np.array(bases)
+
+        def risk_to_profit(X):
+            X = np.abs(X)
+            X /= np.sum(X)
+            profit = profits @ X
+            R = np.sum(bases * X.reshape((X.size, 1, 1)), axis=0, keepdims=False)
+            u, s, vh = np.linalg.svd(R)
+            result = s / profit
+            print(f'{np.max(result):.2e}:{" ".join(f"{float(f):.1e}" for f in result)}')
+            return np.max(result)
+
+        from scipy.optimize import fmin
+        Xopti = fmin(risk_to_profit, [1.] * profits.size)
+        Xopti = np.abs(Xopti)
+        Xopti /= np.sum(Xopti)
         # risk_cross_section = @bases@bases@P
-        print()
+        for x, (profit, quote, base) in zip(Xopti, playables_sorted):
+            if x > 0.0001:
+                print(f'{x * 100:.1f}% x {quote}\{base} BUY')
 
     predictability = np.zeros((9, 10))
     hf = False
