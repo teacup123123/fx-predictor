@@ -27,6 +27,7 @@ PCA on the log'd currency pairs should yield insight on the different vars,
 The relevant timescale should be 10years handwavingly
 '''
 import itertools
+import re
 
 import numpy as np
 import pandas as pd
@@ -37,7 +38,7 @@ import pylab as pl
 from datasets.t_rate_list_format import TimeSeriesMerged, TimeSeriesSingle
 
 core = 'EUR CHF JPY NZD gbp usd CAD'
-rim = 'mxn aud'
+rim = 'mxn aud zar'
 # dataset = 'fred'
 dataset = 'yahoo'
 correlation = f'{core} {rim}'.upper().split()
@@ -46,8 +47,10 @@ parameters = {
     'log100_removetrend': False
 }
 
+PROFIT_RANGES = np.arange(0.2, 8.0, 0.25)
 
-def high_passed(mergedlogged):
+
+def high_pass(mergedlogged):
     geom = 0.
     for curve in mergedlogged.as_np:
         geom += curve
@@ -66,14 +69,14 @@ def high_passed(mergedlogged):
     return high_passed
 
 
-def svd(high_passed):
+def svd(high_passed, normalize=False):
     covar = np.cov(high_passed.as_np)
     _, P = np.linalg.eigh(covar)
     order = np.argsort(_)
     order = np.flip(order)
     P = P[:, order]
 
-    costeffectiveness = 2. / np.sum((np.abs(P)), axis=0, keepdims=True)
+    costeffectiveness = 2. / np.sum((np.abs(P)), axis=0, keepdims=True) if normalize else 1.
     P = P * costeffectiveness
 
     Pinv = np.linalg.inv(P)
@@ -83,20 +86,23 @@ def svd(high_passed):
     return ev, P, Pinv, covar
 
 
-def gridify(c, profit=0.5):  # 5 euros is nice...
+def gridify(c, profit=0.5, accumulated_pips=False):  # 5 euros is nice...
     tmask = np.zeros(c.size, dtype=bool)
     gridmid = c[0]
     gridified = []
     ok = False
+    accu = 0.
     for i, x in enumerate(c):
         if gridmid - profit / 2 > x:
+            accu += np.abs(c[i] - c[i - 1])
             ok, gridmid = True, x + profit / 2
         elif gridmid + profit / 2 < x:
+            accu += np.abs(c[i] - c[i - 1])
             ok, gridmid = True, x - profit / 2
         if ok:
             gridified.append(gridmid)
         tmask[i] = ok
-    return tmask, np.array(gridified)
+    return (tmask, np.array(gridified)) + (accu,) * accumulated_pips
 
 
 def derivate(c):
@@ -124,8 +130,59 @@ def profitability(msk1, goal, msk2, benchmarked, times_length):
     return result[1, 0]
 
 
-if __name__ == '__main__':
+def triangularize(M):
+    representation = []
+    for i in range(M.shape[0]):
+        for j in range(M.shape[1]):
+            if j >= i:
+                representation.append(M[i, j])
+    return representation
 
+
+def best_margins_profitability(mergedlogged, P, playables, goals_intrinsic):
+    times_length = len(mergedlogged.merged_times)
+    risks_mat = []
+    risks_trg = []
+    for quote, base, _ in playables:
+        quote_idx, base_idx = map(mergedlogged.currencies.index, (quote, base))
+        _ = np.zeros(len(mergedlogged.currencies))
+        _[quote_idx] = -1
+        _[base_idx] = 1
+        X = P.T @ _
+        X = X.reshape((X.size, 1))
+        risks_mat.append(X @ X.T)
+        risks_trg.append(np.array(triangularize(X @ X.T)))
+        curve = mergedlogged[base] - mergedlogged[quote]
+        msk1, goal1 = goals_intrinsic[base_idx]
+        msk2, goal2 = goals_intrinsic[quote_idx]
+        msk12 = np.bitwise_and(msk1, msk2)
+        goal = msk12 * 0.
+        goal[msk1] = goal1
+        goal[msk2] -= goal2
+        goal = goal[msk12]
+
+        profits = []
+        eff = []
+        percentage = .85
+        for x in PROFIT_RANGES:
+            msk, benched, accu = gridify(curve, x, accumulated_pips=True)
+            p = profitability(msk12, goal, msk, benched, times_length)
+            profits.append(p)
+            eff.append(accu)
+        eff = np.array(eff)
+        profits = np.array(profits)
+        # pl.plot(PROFIT_RANGES, profits / np.max(np.abs(profits)))
+        # pl.plot(PROFIT_RANGES, eff / np.max(np.abs(eff)))
+        # pl.show()
+        thresh = percentage * np.min(profits)
+        for x, p in zip(PROFIT_RANGES, profits):
+            if p < thresh or x > 4.0:
+                print(f'{quote}->{base}:{x},{p},{np.min(profits)}')
+                break
+        # pl.show()
+
+
+def main():
     if parameters['init']:
         if dataset == 'fred':
             import datasets.fred.unified_format as data_source
@@ -137,7 +194,7 @@ if __name__ == '__main__':
             import datasets.yahoo.unified_format as data_source
 
             data_source.init_pickles('10y', '1d')
-            data_source.as_TSS.ZAR.clear()
+            # data_source.as_TSS.ZAR.clear()
             with open('initialized.pickle', 'wb') as f:
                 pk.dump(data_source.as_TSS.as_dict(), f)
     if parameters['log100_removetrend']:
@@ -160,7 +217,7 @@ if __name__ == '__main__':
     with open('mergedlogged.pickle', 'rb') as f:
         mergedlogged: TimeSeriesMerged = pk.load(f)
 
-    high_passed: TimeSeriesMerged = high_passed(mergedlogged)
+    high_passed: TimeSeriesMerged = high_pass(mergedlogged)
     for currency, curve in zip(high_passed.currencies, high_passed.as_np):
         comeback = np.concatenate((curve, np.flip(curve, axis=0)))
         freqs = np.fft.fftfreq(len(comeback), d=1)
@@ -170,7 +227,6 @@ if __name__ == '__main__':
         high_passed[currency] = curve.real
 
     MAX_EV = len(mergedlogged.currencies) - 1
-    PROFIT_RANGES = np.linspace(0.2, 8.0, 27)
     ev, P, Pinv, covar = svd(high_passed)
     sev = np.sqrt(ev)
 
@@ -182,6 +238,7 @@ if __name__ == '__main__':
     curves = []
 
     times_length = len(mergedlogged.merged_times)
+    goals_intrinsic = []
     goals = []
     goals_hf = []
     for i, c in enumerate(Pinv @ high_passed.as_np):
@@ -192,6 +249,38 @@ if __name__ == '__main__':
         if i == Pinv.shape[0] - 1: break  # static eigen mode of power 0 [1,1,1,1,1]
         msk, goal = derivate(c)
         goals.append((msk, goal))
+    for i, c in enumerate(mergedlogged.as_np):
+        msk, goal = derivate(c)
+        goals_intrinsic.append((msk, goal))
+
+    # with open(r'../market_maker/lion_fx/playable.txt', 'r') as f:
+    #     playables = f.read().split('\n')
+    #     for i, _ in enumerate(playables):
+    #         quote, base, swap = re.match('(\w+)->(\w+):([\+\-0-9\.]+)%', _).groups()
+    #         playables[i] = (quote, base, float(swap) * 0.01)
+    #
+    # best_margins_profitability(mergedlogged, P, playables, goals_intrinsic)
+
+    with open(r'results.txt', 'r') as f:
+        playables = f.read().split('\n')
+        bases = []
+        profits = []
+        playables_sorted = []
+        for _ in playables:
+            quote, base, profit_range, profit, *_ = re.match(
+                '(\w+)->(\w+):([0-9\.]+),-([0-9\.]+),-([0-9\.]+)', _).groups()
+            playables_sorted.append((quote, base, float(profit)))
+        playables_sorted.sort(reverse=True)
+        for quote, base, profit in playables_sorted:
+            quote_idx, base_idx = map(mergedlogged.currencies.index, (quote, base))
+            _ = np.zeros(len(mergedlogged.currencies))
+            _[quote_idx] = -1
+            _[base_idx] = 1
+            bases.append(_)
+            profits.append(profit)
+        bases = np.array(bases).T
+        # risk_cross_section = @bases@bases@P
+        print()
 
     predictability = np.zeros((9, 10))
     hf = False
@@ -250,3 +339,7 @@ if __name__ == '__main__':
     # fred.as_TSS.JPY.plot()
     # pl.show()
     print()
+
+
+if __name__ == '__main__':
+    main()

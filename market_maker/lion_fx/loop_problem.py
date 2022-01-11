@@ -139,6 +139,9 @@ def guess_internalv2():
     identity = load_identity()
     link_numbers = len(identity)
     sum_mat, sum_val, vectors = [], [], []
+    frees.append((-0.004823, -0.01929374573029336, ['JPY', 'ZAR', 'USD', 'AUD']))
+    frees.append((-0.006112, -0.0244490380745789, ['JPY', 'ZAR', 'USD', 'NZD']))
+    frees.append((-0.003491, -0.013967369436944961, ['JPY', 'ZAR', 'USD', 'GBP']))
     for interest, totinterest, ll in frees:
         vec = [0. for _ in range(link_numbers)]
         for i, a in enumerate(ll):
@@ -162,9 +165,9 @@ def guess_internalv2():
         'CHF': 0.0001,
         'GBP': 0.0001,
         'CAD': 0.004 - 0.002,
-        'JPY': -0.005 - 0.004 + 0.0005
+        'JPY': -0.005 - 0.004 + 0.00065
     }
-    forbidden = ['SEK', 'NOK', 'SGD', 'HKD', 'ZAR', 'TRY', 'HUF']
+    forbidden = ['SEK', 'NOK', 'SGD', 'HKD', 'TRY', 'HUF', 'PLN']
 
     with open('figurative_swap2.txt', 'w') as f:
         f.write('\n'.join(
@@ -172,6 +175,14 @@ def guess_internalv2():
             f'{(solution[i] - (correction[a] if a in correction else 0.) + (correction[b] if b in correction else 0.)) * 100:+02.2f}%'
             for (a, b), i in identity.items() if not any(x in forbidden for x in [a, b])
         ))
+    with open('playable.txt', 'w') as f:
+        result = []
+        for (a, b), i in identity.items():
+            val = (solution[i] - (correction[a] if a in correction else 0.) + (
+                correction[b] if b in correction else 0.))
+            if not any(x in forbidden for x in [a, b]) and val > -0.4 * 0.01:
+                result.append(f'{a}->{b}:{val * 100:+02.2f}%')
+        f.write('\n'.join(result))
     print()
 
 
@@ -245,4 +256,4 @@ if __name__ == '__main__':
     # build_problem()
     no_positive_loops()
     # guess_internal()
-    # guess_internalv2()
+    guess_internalv2()
