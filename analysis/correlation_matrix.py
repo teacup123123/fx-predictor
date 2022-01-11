@@ -28,6 +28,7 @@ The relevant timescale should be 10years handwavingly
 '''
 import itertools
 import re
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
@@ -293,14 +294,21 @@ def main():
             print(f'{np.sum(result):.2e} | {np.max(result):.2e} | {" ".join(f"{float(f):.1e}" for f in result)}')
             return np.sum(result)
 
-        from scipy.optimize import fmin
-        Xopti = fmin(risk_to_profit, [1.] * profits.size)
-        Xopti = np.abs(Xopti)
-        Xopti /= np.sum(Xopti)
-        # risk_cross_section = @bases@bases@P
-        for x, (profit, quote, base) in zip(Xopti, playables_sorted):
-            if x > 0.0001:
-                print(f'{x * 100:.1f}% x {quote}\{base} BUY')
+    final = defaultdict(float)
+    directions = defaultdict(bool)
+    from scipy.optimize import fmin
+    Xopti = fmin(risk_to_profit, [1.] * profits.size)
+    Xopti = np.abs(Xopti)
+    Xopti /= np.sum(Xopti)
+    # risk_cross_section = @bases@bases@P
+    for x, (profit, quote, base) in zip(Xopti, playables_sorted):
+        directions[(quote, base)] = True
+        if x > 0.001:
+            final[(min(base, quote), max(base, quote))] += x * 100
+    for (a, b), x in final.items():
+        _ = ("<" * (((b, a) in directions))) + "-" + (">" * ((a, b) in directions))
+        print(f'{x :.1f}% x {a}{_}{b}')
+    print()
 
     predictability = np.zeros((9, 10))
     hf = False
