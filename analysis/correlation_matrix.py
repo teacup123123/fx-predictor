@@ -290,8 +290,8 @@ def main():
             R = np.sum(bases * X.reshape((X.size, 1, 1)), axis=0, keepdims=False)
             u, s, vh = np.linalg.svd(R)
             result = s / profit
-            print(f'{np.max(result):.2e}:{" ".join(f"{float(f):.1e}" for f in result)}')
-            return np.max(result)
+            print(f'{np.sum(result):.2e} | {np.max(result):.2e} | {" ".join(f"{float(f):.1e}" for f in result)}')
+            return np.sum(result)
 
         from scipy.optimize import fmin
         Xopti = fmin(risk_to_profit, [1.] * profits.size)
