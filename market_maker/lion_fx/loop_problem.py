@@ -18,7 +18,7 @@ data_currency_now = r'data_currency_now.txt'
 
 
 def build_problem(topickle=True):
-    links = defaultdict(dict)
+    links = collections.defaultdict(dict)
 
     with open(data_lotsize, 'r') as _:
         lotsize = {
