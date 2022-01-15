@@ -1,5 +1,5 @@
 import requests
-from quick_query.xe_com import grab
+from quick_query.xe import grab
 
 import os
 

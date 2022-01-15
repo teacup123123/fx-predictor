@@ -3,7 +3,7 @@ import math
 import os.path
 import pickle
 import re
-from collections import defaultdict, deque
+import collections
 from typing import List, Dict
 
 import numpy as np
@@ -71,11 +71,8 @@ def no_positive_loops():
 
     nodes: List
     links: Dict[str, Dict]
-    # interdiction = ['TRY', 'ZAR', 'CHF']
-    interdiction = ['TRY', 'ZAR']
-    # interdiction = ['TRY']
-    # interdiction = ['ZAR']
-    for _ in interdiction:
+    interdiction = ['TRY'] + ['ZAR'] * 1 + ['SEK', 'NOK', 'SGD', 'HKD', 'TRY', 'HUF', 'PLN'] * 1
+    for _ in set(interdiction):
         nodes.remove(_)
         del links[_]
         for k, v in links.items():
@@ -121,7 +118,7 @@ def no_positive_loops():
         pickle.dump(goods, f)
 
 
-def guess_internalv2():
+def guess_internalv2(threshold=-0.03):
     with open('cycles.pickle', 'rb') as f:
         frees = pickle.load(f)
     with open('graph.pickle', 'rb') as f:
@@ -156,104 +153,43 @@ def guess_internalv2():
     vectors = np.array(vectors).T
     ys = sum_mat @ vectors
     solution = vectors[:, :] @ scipy.linalg.solve(ys[:, :], sum_val[:])
-    # test = sum_mat @ solution
-    correction = {
-        'USD': 0.007,
-        'EUR': 0.002 - 0.002,
-        'NZD': 0.0009,
-        'AUD': 0.001,
-        'CHF': 0.0001,
-        'GBP': 0.0001,
-        'CAD': 0.004 - 0.002,
-        'JPY': -0.005 - 0.004 + 0.00065
-    }
-    forbidden = ['SEK', 'NOK', 'SGD', 'HKD', 'TRY', 'HUF', 'PLN']
+    manual_correction = collections.defaultdict(float, {
+        'USD': 0.007 - 0.0003,
+        'EUR': 0.002 - 0.002 + 0.004,
+        'NZD': 0.0009 + 0.0044 - 0.00041,
+        'AUD': 0.001 + 0.0036,
+        'CHF': 0.0001 + 0.004,
+        'GBP': 0.0001 + 0.0045,
+        'CAD': 0.004 - 0.002 + 0.0025,
+        'MXN': 0.0035,
+        'JPY': -0.005 - 0.004 + 0.00065 + 0.0081 + 0.0001
+    })
+    forbidden = ['SEK', 'NOK', 'SGD', 'HKD', 'TRY', 'HUF', 'PLN', 'ZAR']
 
     with open('figurative_swap2.txt', 'w') as f:
         f.write('\n'.join(
             f'{a}->{b}:'
-            f'{(solution[i] - (correction[a] if a in correction else 0.) + (correction[b] if b in correction else 0.)) * 100:+02.2f}%'
-            for (a, b), i in identity.items() if not any(x in forbidden for x in [a, b])
+            f'{(solution[i] - manual_correction[a] + manual_correction[b]) * 100:+02.2f}%'
+            for (a, b), i in identity.items()
+            if not any(x in forbidden for x in [a, b])
         ))
     with open('playable.txt', 'w') as f:
         result = []
         for (a, b), i in identity.items():
-            val = (solution[i] - (correction[a] if a in correction else 0.) + (
-                correction[b] if b in correction else 0.))
-            if not any(x in forbidden for x in [a, b]) and val > -0.4 * 0.01:
+            val = (solution[i] - (manual_correction[a] if a in manual_correction else 0.) + (
+                manual_correction[b] if b in manual_correction else 0.))
+            if not any(x in forbidden for x in [a, b]) and val > threshold:
                 result.append(f'{a}->{b}:{val * 100:+02.2f}%')
         f.write('\n'.join(result))
     print()
 
 
-#
-# def guess_internal():
-#     with open('cycles.pickle', 'rb') as f:
-#         frees = pickle.load(f)
-#     with open('graph.pickle', 'rb') as f:
-#         nodes, links = pickle.load(f)
-#
-#     simple_graph_links = set()
-#     good_cycles, totinterests = [], []
-#     for interest, totinterest, ll in frees:
-#         # if interest < 0.01:
-#         if True:
-#             good_cycles.append((totinterest, ll))
-#             totinterests.append(totinterest)
-#             for l in zip(ll[:-1] + [ll[-1]], ll[1:] + [ll[0]]):
-#                 simple_graph_links.add(l)
-#     simple_graph_links_idx = {l: i for i, l in enumerate(simple_graph_links)}
-#     simple_graph_links = list(simple_graph_links)
-#     mat = np.zeros((len(good_cycles), len(simple_graph_links)))
-#     for i, (totinterest, ll) in enumerate(good_cycles):
-#         for l in zip(ll[:-1] + [ll[-1]], ll[1:] + [ll[0]]):
-#             mat[i, simple_graph_links_idx[l]] += 1
-#
-#     (commission, *_) = np.linalg.lstsq(mat, totinterests)
-#     voltage = defaultdict(float)
-#     root = 'JPY'
-#     voltage[root] = 0.
-#     bfs = deque([root])
-#     while len(bfs):
-#         root = bfs.popleft()
-#         for dst in links[root]:
-#             if (root, dst) in simple_graph_links_idx and dst not in voltage:
-#                 voltage[dst] = links[root][dst] - commission[simple_graph_links_idx[(root, dst)]]
-#                 bfs.append(dst)
-#     for (root, dst) in simple_graph_links_idx:
-#         commission[simple_graph_links_idx[(root, dst)]] += voltage[dst] - voltage[root]
-#
-#     for c, _ in [
-#         ('USD', -0.004 - 0.004 - 0.0006 - 0.0001 + 0.0002 + 0.0005 - 0.0007),
-#         ('MXN', 0.05 - 0.009 - 0.1 + 0.0001 + 0.0023 + 0.0006),
-#         ('NZD', -0.0022 - 0.0044 - 0.005 + 0.0030 + 0.0016 - 0.0031 + 0.0005 - 0.00045 + 0.0003),
-#         ('JPY', -0.005 + 0.0016 + 0.0005),
-#         ('GBP', -0.0034 - 0.0005 - 0.005 + 0.0007),
-#         ('AUD', -0.0032 - 0.003),
-#         ('SGD', -0.0013 - 0.004 - 0.001),
-#         ('NOK', -0.0018 - 0.005),
-#         ('SEK', -0.004),
-#         ('CAD', -0.006 + 0.0005),
-#         ('PLN', -0.0008 - 0.0002 - 0.001),
-#         ('EUR', -0.0009 - 0.0002),
-#         ('CHF', +0.0014 + 0.0001),
-#     ]:
-#         for (src, dst) in simple_graph_links_idx:
-#             commission[simple_graph_links_idx[(src, dst)]] += _ * (dst == c) - _ * (src == c)
-#
-#     for (root, dst) in simple_graph_links_idx:
-#         print(f'{root}->{dst} = {commission[simple_graph_links_idx[(root, dst)]]:+.4f}')
-#
-#     linksTrue = copy.deepcopy(links)
-#
-#     for l in links:
-#         pass
-#
-#     print()
-
-
-if __name__ == '__main__':
+def main():
     # build_problem()
     no_positive_loops()
     # guess_internal()
     guess_internalv2()
+
+
+if __name__ == '__main__':
+    main()

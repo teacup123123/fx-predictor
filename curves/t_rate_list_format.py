@@ -10,6 +10,8 @@ import pylab as pl
 
 @dataclasses.dataclass
 class TimeSeriesSingle(List[Tuple[pd.Timestamp, float]]):
+    """of type List[Tuple[pd.Timestamp, float]]"""
+
     @property
     def np(self):
         """returns a copy!"""
@@ -34,9 +36,21 @@ class TimeSeriesSingle(List[Tuple[pd.Timestamp, float]]):
         ts, rates = zip(*self.np)
         pl.plot(ts, rates)
 
+    def __repr__(self):
+        content = f'[{self[0]}..{self[-1]}]' if len(self) else '[]'
+        return f'TimeSeriesSingle({content})'
+
 
 @dataclasses.dataclass
 class TimeSeriesMerged:
+    """
+    - merged_times: List[pd.Timestamp]
+    - currencies: List[str]
+    - as_np: np.ndarray `contains underlying data`
+
+    Constructor:
+        TimeSeriesMerged(period: Tuple[pd.Timestamp, pd.Timestamp], name2TSS: Dict[str, TimeSeriesSingle])
+    """
     merged_times: List[pd.Timestamp]
     currencies: List[str]
     as_np: np.ndarray

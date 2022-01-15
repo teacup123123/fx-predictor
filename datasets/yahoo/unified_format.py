@@ -1,13 +1,13 @@
 import re
 import os
 from collections import defaultdict
-from typing import List
 import pickle as pk
+from typing import Dict
 
 import pandas as pd
 import pylab as pl
 
-from datasets.t_rate_list_format import TimeSeriesSingle
+from curves.t_rate_list_format import TimeSeriesSingle
 
 _dir, _ = os.path.split(__file__)
 
@@ -63,7 +63,7 @@ class as_TSS:
         return len(v) > 0
 
     @staticmethod
-    def as_dict():
+    def as_dict() -> Dict[str, TimeSeriesSingle]:
         result = {k: v for k, v in as_TSS.__dict__.items() if as_TSS.is_legal_inited(k, v)}
         return result
 

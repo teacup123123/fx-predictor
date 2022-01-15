@@ -2,9 +2,8 @@ import os
 from typing import List
 
 import pandas as pd
-import pylab as pl
 
-from datasets.t_rate_list_format import TimeSeriesSingle
+from curves.t_rate_list_format import TimeSeriesSingle
 
 _dir, _ = os.path.split(__file__)
 

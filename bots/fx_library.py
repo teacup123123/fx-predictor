@@ -1,16 +1,16 @@
 import math
-from enum import Enum, auto
-from dataclasses import dataclass, field
-from collections import Sized
+import enum
+import dataclasses
+import collections
 from typing import List, Callable, Any, NewType, Union, Iterable, Type
 
 
-class Nature(Enum):
-    buy = auto()
-    sell = auto()
+class NatureBuyOrSell(enum.Enum):
+    buy = enum.auto()
+    sell = enum.auto()
 
 
-class CurrencyEnumIdx0(Enum):
+class CurrencyEnumIdx0(enum.Enum):
     """automatic enum structure that starts with index = 0 """
 
     def __new__(cls):
@@ -23,11 +23,11 @@ class CurrencyEnumIdx0(Enum):
 Derived_CurrencyEnumIdx0 = NewType('derived_CurrencyEnumIdx0', CurrencyEnumIdx0)
 
 
-@dataclass
+@dataclasses.dataclass
 class Rates:
     """The rates at a specific time, thin wrapper of a list object"""
     home_currency: Derived_CurrencyEnumIdx0
-    as_list: List[float] = field(default_factory=list)
+    as_list: List[float] = dataclasses.field(default_factory=list)
 
     def __init__(self, currency_enum, home_currency: Derived_CurrencyEnumIdx0):
         self.as_list = [math.nan] * (len(currency_enum))
@@ -43,17 +43,17 @@ class Rates:
         self.as_list[Derived_CurrencyEnumIdx0.value] = value
 
 
-@dataclass
+@dataclasses.dataclass
 class CurrencyBasket:
     """A basket with different currencies of different interest rates"""
-    _CurrencyEnumIdx0: Union[Sized, Iterable, Type]
+    _CurrencyEnumIdx0: Union[collections.Sized, Iterable, Type]
     as_list: list
 
     @property
     def CurrencySet(self):
         return [c.name for c in self._CurrencyEnumIdx0]
 
-    def __init__(self, _CurrencyEnumIdx0: Union[Sized, Iterable, Type]):
+    def __init__(self, _CurrencyEnumIdx0: Union[collections.Sized, Iterable, Type]):
         self._CurrencyEnumIdx0 = _CurrencyEnumIdx0
         self.as_list = [0.] * (len(_CurrencyEnumIdx0))
 
@@ -70,7 +70,7 @@ class CurrencyBasket:
         self.as_list[Derived_CurrencyEnumIdx0.value] = value
 
 
-@dataclass
+@dataclasses.dataclass
 class Direction:
     base_currency: Derived_CurrencyEnumIdx0
     quote_currency: Derived_CurrencyEnumIdx0
@@ -140,12 +140,12 @@ class Direction:
         return realized
 
 
-@dataclass
+@dataclasses.dataclass
 class DeadlockAssets:
-    Currency_type: Union[Sized, Iterable, Type]
+    Currency_type: Union[collections.Sized, Iterable, Type]
     directions: List[Direction]
 
-    def __init__(self, Currency_type: Union[Sized, Iterable, Type]):
+    def __init__(self, Currency_type: Union[collections.Sized, Iterable, Type]):
         self.Currency_type = Currency_type
         self.directions = []
 
@@ -177,14 +177,3 @@ class DeadlockAssets:
             return self.directions[added_idx]
 
         return decorated
-
-        # No setter coz position once defined is final
-        # def decorated_setter(self, value):
-        #     nonlocal added_at
-        #     self: PositionAssets
-        #     if added_at == -1:
-        #         position = position_Creator(self)
-        #         added_at = len(self.directions)
-        #         self.directions.append(position)
-        #     self.directions[added_at] = value
-        # return property(decorated, fset=decorated_setter)
