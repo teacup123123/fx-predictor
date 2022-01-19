@@ -1,4 +1,5 @@
 import os
+from typing import Tuple
 
 import pandas as pd
 
@@ -12,7 +13,19 @@ _, OUTPUT = os.path.split(__file__)
 OUTPUT = OUTPUT.replace('.py', '.pickle')
 
 
+def merged(input, params: AnalysisParameters = None) -> TimeSeriesMerged:
+    return calc_all(input, params)[0]
+
+
+def logPercent(input, params: AnalysisParameters = None) -> TimeSeriesMerged:
+    return calc_all(input, params)[1]
+
+
 def logPercentRemoveTrend(input, params: AnalysisParameters = None) -> TimeSeriesMerged:
+    return calc_all(input, params)[2]
+
+
+def calc_all(input, params: AnalysisParameters = None):
     if params is None:
         params = DEFAULT
     if params.doStep1LogPercentRemoveTrend:
@@ -30,12 +43,16 @@ def logPercentRemoveTrend(input, params: AnalysisParameters = None) -> TimeSerie
         _['USD'] = fake_usd
 
         merged = TimeSeriesMerged(period, _)
-        mergedloggedNoTrend: TimeSeriesMerged = merged.log100.remove_trend()
+        mergedlogged = merged.log100
+        mergedloggedNoTrend: TimeSeriesMerged = mergedlogged.remove_trend()
         with open(os.path.join(analysis.pickles_root, OUTPUT), 'wb') as f:
-            pk.dump(mergedloggedNoTrend, f)
+            pk.dump((merged, mergedlogged, mergedloggedNoTrend), f)
     with open(os.path.join(analysis.pickles_root, OUTPUT), 'rb') as f:
-        mergedloggedNoTrend: TimeSeriesMerged = pk.load(f)
-    return mergedloggedNoTrend
+        merged: TimeSeriesMerged
+        mergedlogged: TimeSeriesMerged
+        mergedloggedNoTrend: TimeSeriesMerged
+        merged, mergedlogged, mergedloggedNoTrend = pk.load(f)
+    return merged, mergedlogged, mergedloggedNoTrend
 
 
 def main():

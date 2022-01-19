@@ -76,13 +76,14 @@ def optimizeProfits(mergedlogged: TimeSeriesMerged, playables,
             print(msg)
             quote: str
             base: str
-            result[(quote, base)] = profitability(thresh, x, xlow, xhi)
+            result[(quote, base)] = (thresh, x, xlow, xhi)
         with open(os.path.join(analysis.pickles_root, OUTPUT), 'wb') as f:
             pk.dump((basis, result, msgs), f)
     else:
         with open(os.path.join(analysis.pickles_root, OUTPUT), 'rb') as f:
             basis, result, msgs = pk.load(f)
-
+    for k,v in result.items():
+        result[k] = profitability(*v)
     return basis, result, msgs
 
 
