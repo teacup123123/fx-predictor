@@ -9,6 +9,10 @@ import pandas as pd
 from bots.Position import Position, PositionStatus, NatureBuyOrSell
 
 
+def money_format(f: float):
+    return "¥{:,.0f}".format(f)
+
+
 @dataclasses.dataclass
 class BotBasket:
     currencies: List[str]
@@ -46,12 +50,29 @@ class BotBasket:
         self.lotsize_dict = lotsize_dict
 
     def update_time_and_rates(self, new_time: pd.Timestamp, new_values_USD_based: np.ndarray):
+        idx_home = self.currencies.index(self.home_currency)
+        positives = 0.
+        negatives = 0.
+        for position in self.positions_pendingOrOpen:
+            if position.status == PositionStatus.pending: continue
+            idx_base = self.currencies.index(position.base)
+            idx_quote = self.currencies.index(position.quote)
+            quote_home = new_values_USD_based[idx_quote] / new_values_USD_based[idx_home]
+            gain = position.unrealized(new_values_USD_based[idx_base] / new_values_USD_based[idx_quote]) * quote_home
+            if gain > 0:
+                positives += gain
+            else:
+                negatives += gain
+        unrealized = positives + negatives
+        full = self.deposit_home + unrealized
+        print(f'==={new_time}|'
+              f'{money_format(negatives)}{money_format(positives)}{money_format(self.deposit_home)}='
+              f'{money_format(full)}===')
         if new_time <= self._time:
             raise ValueError('time only moves forward!')
         delta_time: pd.Timedelta = new_time - self._time
 
-        old_values_USD_based: np.ndarray = np.array(new_values_USD_based)
-
+        old_values_USD_based: np.ndarray = np.array(self.values_USD_based)
         new_positions_pendingOrOpen = []
         for position in self.positions_pendingOrOpen:
             idx_base = self.currencies.index(position.base)
@@ -62,25 +83,37 @@ class BotBasket:
             if position.status == PositionStatus.pending:
                 if (new_rate - position.price_open) * (old_rate - position.price_open) <= 0:
                     position.open(new_time - delta_time * 0.6, position.price_open)
+                    print(f'!!{position}')
                     if (new_rate - position.price_close) * (1 if position.nature == NatureBuyOrSell.buy else -1) >= 0:
-                        position.close(new_time - delta_time * 0.4, position.price_close)
+                        gain = new_values_USD_based[idx_quote] / new_values_USD_based[idx_home] * \
+                               position.close(new_time - delta_time * 0.4, position.price_close)
+                        self.deposit_home += gain
+                        print(f'##{position}/{gain:.2f} -> deposit = {self.deposit_home}')
                         self.positions_Closed.append(position)
                     else:
                         new_positions_pendingOrOpen.append(position)
+                else:
+                    new_positions_pendingOrOpen.append(position)
             else:
                 assert position.status == PositionStatus.open
                 # calculate swap
-                swap = self.swaps[(position.sell, position.buy)] * delta_time / pd.Timedelta(years=1)
-                position.price_open = position.price_open * \
-                                      (1 + swap * (-1 if position.nature == NatureBuyOrSell.buy else +1))
+                swap = self.swaps[(position.sell, position.buy)] * (delta_time / pd.Timedelta(days=365))
+                position._price_open = position.price_open * \
+                                       (1 + swap * (-1 if position.nature == NatureBuyOrSell.buy else +1))
 
                 if (new_rate - position.price_close) * (old_rate - position.price_close) <= 0:
-                    position.close(new_time - delta_time * 0.5, position.price_close)
+                    gain = new_values_USD_based[idx_quote] / new_values_USD_based[idx_home] * \
+                           position.close(new_time - delta_time * 0.5, position.price_close)
+                    self.deposit_home += gain
+                    print(f'##{position}/{gain:.2f} -> deposit = {self.deposit_home}')
                     self.positions_Closed.append(position)
                 else:
                     new_positions_pendingOrOpen.append(position)
 
         self.positions_pendingOrOpen = new_positions_pendingOrOpen
+        self.values_USD_based[:] = new_values_USD_based[:]
+        self._time = new_time
+        return negatives, positives, full
 
     def if_open(self, pair: Tuple[str, str], if_open: float, if_close: float):
         sell, buy = pair
@@ -91,6 +124,7 @@ class BotBasket:
                            lot_size=lotsize,
                            price_open=if_open,
                            price_close=if_close)
+        print(f'?{created}')
         self.positions_pendingOrOpen.append(created)
 
     def order_now(self, pair: Tuple[str, str], if_close):
@@ -108,10 +142,10 @@ class BotBasket:
         idx_quote = self.currencies.index(created.quote)
         open_price = self.values_USD_based[idx_base] / self.values_USD_based[idx_quote]
         created.open(self._time, open_price)
-
+        # print(f'+{created}')
         self.positions_pendingOrOpen.append(created)
 
-    def filter(self, pair: Tuple[str, str], status=None, respect_sell_buy=False):
+    def filter(self, pair: Tuple[str, str], status: PositionStatus = None, respect_sell_buy=False):
         def filter_function(position: Position):
             sb = (position.sell, position.buy)
             if status is not None:

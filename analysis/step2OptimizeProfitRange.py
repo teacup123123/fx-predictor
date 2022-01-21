@@ -5,6 +5,7 @@ from typing import Tuple, Dict
 
 import pickle as pk
 import numpy as np
+import pylab as pl
 
 import analysis
 from analysis.parameters import AnalysisParameters, DEFAULT
@@ -77,12 +78,17 @@ def optimizeProfits(mergedlogged: TimeSeriesMerged, playables,
             quote: str
             base: str
             result[(quote, base)] = (thresh, x, xlow, xhi)
+
+            # pl.title(f'{base}-{quote}')
+            # pl.plot(params.p2OptimizeProfitRange.PROFIT_RANGES, closeable_profit)
+            # pl.show()
+
         with open(os.path.join(analysis.pickles_root, OUTPUT), 'wb') as f:
             pk.dump((basis, result, msgs), f)
     else:
         with open(os.path.join(analysis.pickles_root, OUTPUT), 'rb') as f:
             basis, result, msgs = pk.load(f)
-    for k,v in result.items():
+    for k, v in result.items():
         result[k] = profitability(*v)
     return basis, result, msgs
 
@@ -92,7 +98,8 @@ def main():
     playables = step0LoadPlayables.loadPlayables()
     mergedlogged = step1LogPercentRemoveTrend.main()
     DEFAULT.doStep2COptimizeProfitRange = True
-    optimizeProfits(mergedlogged, playables)
+    basis, result, msgs = optimizeProfits(mergedlogged, playables)
+    print()
 
 
 if __name__ == '__main__':
